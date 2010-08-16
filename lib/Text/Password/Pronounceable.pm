@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Carp;
 
-our $VERSION = '0.28';
+our $VERSION = '0.30';
 
 # frequency of English digraphs (from D Edwards 1/27/66) 
 my  $frequency = [
@@ -137,9 +137,26 @@ my  $start_freq = [
 my  $total_sum = 0;
 $total_sum += $_ for @$start_freq;
 
+sub _check_lengths {
+    my ($min, $max) = @_;
+
+    Carp::carp "min length should be defined" unless defined $min;
+    Carp::carp "min length should be > 0" unless $min>0;
+
+    Carp::carp "max length should be defined" unless defined $max;
+    Carp::carp "max length should be > 0" unless $max>0;
+
+    Carp::carp "max length must be >= min length" unless $min<=$max;
+}
+
 sub new {
     my $class = shift;
     my ($min, $max) = @_;
+    $max ||= $min;
+
+    if (@_) {
+	_check_lengths($min, $max);
+    }
 
     return bless { min => $min, max => $max }, $class;
 }
@@ -147,12 +164,19 @@ sub new {
 sub generate {
     my $self = shift;
     my ($min, $max) = @_;
-    if (ref $self) {
-	$min ||= $self->{min};
-	$max ||= $self->{max} || $self->{min};
-    }
 
-    Carp::carp "min and max length must be defined" if !$min || !$max;
+    if (@_) {
+        $max ||= $min;
+        _check_lengths($min, $max);
+    } elsif (ref $self) { # if given no arguments,
+        # use the factory settings (if any)
+        $min = $self->{min};
+        $max = $self->{max};
+    }
+    if ( !$min && !$max ) {
+        # what? no parameters?
+        return q[]; # no random password
+    }
 
     # When munging characters, we need to know where to start counting letters from
     my $a = ord('a');
@@ -214,14 +238,26 @@ digraphs by D Edwards.
 
 =over
 
-=item new($min, $max)
+=item B<new>
+
+  $pp = Text::Password::Pronounceable->new($min, $max);
+  $pp = Text::Password::Pronounceable->new($len);
 
 Construct a password factory with length limits of $min and $max.
-If $max is omitted, it defaults to $min.
+Or create a password factory with fixed length if only one argument
+is provided.
 
-=item generate
+=item B<generate>
 
-Generate password.
+  $pp->generate;
+  $pp->generate($len);
+  $pp->generate($min, $max);
+
+  Text::Password::Pronounceable->generate($len);
+  Text::Password::Pronounceable->generate($min, $max);
+
+Generate password. If used as an instance method, arguments override
+the factory settings.
 
 =back
 
@@ -229,11 +265,29 @@ Generate password.
 
 This code derived from mpw.pl, a bit of code with a sordid history.
 
+=over 4
+
+=item *
+
 CPAN module by Chia-liang Kao 9/11/2006.
+
+=item *
+
 Perl cleaned up a bit by Jesse Vincent 1/14/2001.
+
+=item *
+
 Converted to perl from C by Marc Horowitz, 1/20/2000.
+
+=item *
+
 Converted to C from Multics PL/I by Bill Sommerfeld, 4/21/86.
+
+=item *
+
 Original PL/I version provided by Jerry Saltzer.
+
+=back
 
 =head1 LICENSE
 
